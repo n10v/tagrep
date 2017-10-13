@@ -1,6 +1,6 @@
 # tagrep
 
-![Screenshot](https://raw.github.com/bogem/tagrep/master/screnshot.png)
+![Screenshot](./screnshot.png)
 
 ## Description
 
