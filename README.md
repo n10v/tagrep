@@ -1,6 +1,6 @@
 # tagrep
 
-![Screenshot](./screnshot.png)
+![Screenshot](./screenshot.png)
 
 ## Description
 
