@@ -5,7 +5,7 @@
 tagrep is a tiny CLI utlity for finding tracks with the given ID3 frames
 (e.g. artist, title or year).
 
-## Install
+## Installation
 
     go get -u github.com/bogem/tagrep
 
