@@ -1,5 +1,7 @@
 # tagrep
 
+![Screenshot](https://raw.github.com/bogem/tagrep/master/screnshot.png)
+
 ## Description
 
 tagrep is a tiny CLI utlity for finding tracks with the given ID3 frames
@@ -7,7 +9,7 @@ tagrep is a tiny CLI utlity for finding tracks with the given ID3 frames
 
 ## Install
 
-`go get -u github.com/bogem/tagrep`
+  go get -u github.com/bogem/tagrep
 
 ## Usage
 
