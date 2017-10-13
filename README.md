@@ -2,8 +2,6 @@
 
 ![Screenshot](./screenshot.png)
 
-## Description
-
 tagrep is a tiny CLI utlity for finding tracks with the given ID3 frames
 (e.g. artist, title or year).
 
