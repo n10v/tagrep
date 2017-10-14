@@ -5,7 +5,6 @@
 package main
 
 import (
-	"bytes"
 	"fmt"
 	"log"
 	"os"
@@ -25,10 +24,9 @@ var (
 	abs, alpha, recursive, ignoreCase, verbose bool
 
 	// For internal usage.
+	tagPool      = sync.Pool{New: func() interface{} { return id3v2.NewEmptyTag() }}
 	total, found int64
 	wd           string
-	result       = new(bytes.Buffer)
-	tagPool      = sync.Pool{New: func() interface{} { return id3v2.NewEmptyTag() }}
 )
 
 func main() {
@@ -42,7 +40,7 @@ Flags:
 	}
 
 	pflag.BoolVar(&abs, "abs", false, "print absolute paths")
-	pflag.BoolVar(&ignoreCase, "ignore-case", false, "print absolute paths")
+	pflag.BoolVarP(&ignoreCase, "ignore-case", "i", false, "ignore case on matching frames")
 	pflag.StringVar(&artist, "artist", "", "match artist")
 	pflag.StringVar(&title, "title", "", "match title")
 	pflag.BoolVarP(&recursive, "recursive", "r", false, "recursive search")
@@ -57,10 +55,12 @@ Flags:
 		os.Exit(1)
 	}
 
-	var err error
-	wd, err = os.Getwd()
-	if err != nil {
-		log.Fatalln(err)
+	if abs {
+		var err error
+		wd, err = os.Getwd()
+		if err != nil {
+			log.Fatalln(err)
+		}
 	}
 
 	initOptions()
@@ -122,7 +122,7 @@ func search(dir string, wg *sync.WaitGroup) {
 			}
 
 			// Path to file.
-			path := joinPaths(dir, fi.Name())
+			path := filepath.Join(dir, fi.Name())
 
 			// If it's dir and recursive flag is set,
 			// then parse tracks there, else end the search.
@@ -139,21 +139,6 @@ func search(dir string, wg *sync.WaitGroup) {
 	}
 }
 
-// Fast implementation of filepath.Join. It can join only two paths.
-// It's about 9-10x faster than filepath.Join and allocates no memory.
-func joinPaths(a string, b string) string {
-	// If a ends at path separator and b begins with path separator.
-	if a[len(a)-1] == os.PathSeparator && b[0] == os.PathSeparator {
-		return a + b[1:]
-	}
-	// If a has no path separator at the end
-	// and b has no path separator at the beginning.
-	if a[len(a)-1] != os.PathSeparator && b[0] != os.PathSeparator {
-		return a + string(os.PathSeparator) + b
-	}
-	return a + b
-}
-
 // Copy of ioutil.ReadDir but just without sort.
 func readDir(dirname string) ([]os.FileInfo, error) {
 	f, err := os.Open(dirname)
@@ -165,7 +150,7 @@ func readDir(dirname string) ([]os.FileInfo, error) {
 }
 
 func match(path string) {
-	// Open file under path.
+	// Open file.
 	file, err := os.Open(path)
 	if err != nil {
 		if verbose {
@@ -199,7 +184,8 @@ func match(path string) {
 		return
 	}
 
-	atomic.AddInt64(&found, 1) // found++
+	atomic.AddInt64(&found, 1)
+
 	if abs && !filepath.IsAbs(path) {
 		fmt.Println(filepath.Join(wd, path))
 	} else {
