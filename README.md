@@ -19,6 +19,7 @@ Usage:
 Flags:
       --abs             print absolute paths
       --artist string   match artist
+  -e, --exts strings    parse files only with given extensions. use "*" for parsing all files (default [.mp3])
   -i, --ignore-case     ignore case on matching frames
   -r, --recursive       recursive search
       --title string    match title
