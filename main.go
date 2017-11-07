@@ -20,10 +20,12 @@ import (
 
 var (
 	// Flag values.
-	artist, title, year                        string
-	abs, alpha, recursive, ignoreCase, verbose bool
+	flagArtist, flagTitle, flagYear                     string
+	flagAbs, flagRecursive, flagIgnoreCase, flagVerbose bool
+	flagExts                                            []string
 
 	// For internal usage.
+	inExts       map[string]bool
 	tagPool      = sync.Pool{New: func() interface{} { return id3v2.NewEmptyTag() }}
 	total, found int64
 	wd           string
@@ -39,13 +41,14 @@ Flags:
 		pflag.PrintDefaults()
 	}
 
-	pflag.BoolVar(&abs, "abs", false, "print absolute paths")
-	pflag.BoolVarP(&ignoreCase, "ignore-case", "i", false, "ignore case on matching frames")
-	pflag.StringVar(&artist, "artist", "", "match artist")
-	pflag.StringVar(&title, "title", "", "match title")
-	pflag.BoolVarP(&recursive, "recursive", "r", false, "recursive search")
-	pflag.StringVar(&year, "year", "", "match year")
-	pflag.BoolVarP(&verbose, "verbose", "v", false, "verbose output")
+	pflag.BoolVar(&flagAbs, "abs", false, "print absolute paths")
+	pflag.StringVar(&flagArtist, "artist", "", "match artist")
+	pflag.StringSliceVarP(&flagExts, "exts", "e", []string{".mp3"}, `parse files only with given extensions. use "*" for parsing all files`)
+	pflag.BoolVarP(&flagIgnoreCase, "ignore-case", "i", false, "ignore case on matching frames")
+	pflag.BoolVarP(&flagRecursive, "recursive", "r", false, "recursive search")
+	pflag.StringVar(&flagTitle, "title", "", "match title")
+	pflag.BoolVarP(&flagVerbose, "verbose", "v", false, "verbose output")
+	pflag.StringVar(&flagYear, "year", "", "match year")
 	pflag.Parse()
 
 	dirs := pflag.Args()
@@ -55,7 +58,7 @@ Flags:
 		os.Exit(1)
 	}
 
-	if abs {
+	if flagAbs {
 		var err error
 		wd, err = os.Getwd()
 		if err != nil {
@@ -64,6 +67,13 @@ Flags:
 	}
 
 	initOptions()
+
+	if len(flagExts) > 0 && flagExts[0] != "*" {
+		inExts = make(map[string]bool, len(flagExts))
+		for _, ext := range flagExts {
+			inExts[ext] = true
+		}
+	}
 
 	var wg sync.WaitGroup
 	t := time.Now()
@@ -82,17 +92,18 @@ var opts = id3v2.Options{
 }
 
 func initOptions() {
-	if artist != "" {
+	if flagArtist != "" {
 		opts.ParseFrames = append(opts.ParseFrames, "Artist")
 	}
-	if title != "" {
+	if flagTitle != "" {
 		opts.ParseFrames = append(opts.ParseFrames, "Title")
 	}
-	if year != "" {
+	if flagYear != "" {
 		opts.ParseFrames = append(opts.ParseFrames, "Year")
 	}
 	if len(opts.ParseFrames) == 0 {
-		opts.Parse = false
+		// No frames to parse. Exit.
+		os.Exit(0)
 	}
 }
 
@@ -127,10 +138,14 @@ func search(dir string, wg *sync.WaitGroup) {
 			// If it's dir and recursive flag is set,
 			// then parse tracks there, else end the search.
 			if fi.IsDir() {
-				if recursive {
+				if flagRecursive {
 					wg.Add(1)
 					search(path, wg)
 				}
+				return
+			}
+
+			if len(inExts) > 0 && !inExts[filepath.Ext(fi.Name())] {
 				return
 			}
 
@@ -153,7 +168,7 @@ func match(path string) {
 	// Open file.
 	file, err := os.Open(path)
 	if err != nil {
-		if verbose {
+		if flagVerbose {
 			log.Println("ERROR: ", path, ":", err)
 		}
 		return
@@ -164,7 +179,7 @@ func match(path string) {
 	tag := tagPool.Get().(*id3v2.Tag)
 	defer tagPool.Put(tag)
 	if err := tag.Reset(file, opts); err != nil {
-		if verbose {
+		if flagVerbose {
 			log.Println("ERROR: ", path, ":", err)
 		}
 		return
@@ -174,19 +189,19 @@ func match(path string) {
 		return
 	}
 
-	if artist != "" && !areStringsEqual(tag.Artist(), artist, ignoreCase) {
+	if flagArtist != "" && !areStringsEqual(tag.Artist(), flagArtist, flagIgnoreCase) {
 		return
 	}
-	if title != "" && !areStringsEqual(tag.Title(), title, ignoreCase) {
+	if flagTitle != "" && !areStringsEqual(tag.Title(), flagTitle, flagIgnoreCase) {
 		return
 	}
-	if year != "" && !areStringsEqual(tag.Year(), year, ignoreCase) {
+	if flagYear != "" && !areStringsEqual(tag.Year(), flagYear, flagIgnoreCase) {
 		return
 	}
 
 	atomic.AddInt64(&found, 1)
 
-	if abs && !filepath.IsAbs(path) {
+	if flagAbs && !filepath.IsAbs(path) {
 		fmt.Println(filepath.Join(wd, path))
 	} else {
 		fmt.Println(path)
