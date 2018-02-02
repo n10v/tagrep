@@ -115,42 +115,32 @@ func search(dir string, wg *sync.WaitGroup) {
 		log.Fatal(err)
 	}
 
-	wg.Add(len(fileInfos))
-	for _, fileInfo := range fileInfos {
-		go func(fi os.FileInfo) {
-			defer wg.Done()
+	for _, fi := range fileInfos {
+		path := filepath.Join(dir, fi.Name())
 
-			// Increment total.
-			if !fi.IsDir() {
-				atomic.AddInt64(&total, 1)
+		if fi.IsDir() {
+			if flagRecursive {
+				wg.Add(1)
+				go search(path, wg)
 			}
+			continue
+		}
 
-			// Check if file is more than 20 bytes.
-			// It makes no sense to parse file less than 20 bytes,
-			// because header of ID3v2 tag and of one frame header equal to 20 bytes.
-			if fi.Size() < 20 {
-				return
-			}
+		atomic.AddInt64(&total, 1)
 
-			// Path to file.
-			path := filepath.Join(dir, fi.Name())
+		// Check if file is more than 20 bytes.
+		// It makes no sense to parse file less than 20 bytes,
+		// because header of ID3v2 tag and of one frame header equal to 20 bytes.
+		if fi.Size() < 20 {
+			continue
+		}
 
-			// If it's dir and recursive flag is set,
-			// then parse tracks there, else end the search.
-			if fi.IsDir() {
-				if flagRecursive {
-					wg.Add(1)
-					search(path, wg)
-				}
-				return
-			}
+		if len(inExts) > 0 && !inExts[filepath.Ext(fi.Name())] {
+			continue
+		}
 
-			if len(inExts) > 0 && !inExts[filepath.Ext(fi.Name())] {
-				return
-			}
-
-			match(path)
-		}(fileInfo)
+		wg.Add(1)
+		go match(path, wg)
 	}
 }
 
@@ -164,7 +154,9 @@ func readDir(dirname string) ([]os.FileInfo, error) {
 	return f.Readdir(-1)
 }
 
-func match(path string) {
+func match(path string, wg *sync.WaitGroup) {
+	defer wg.Done()
+
 	// Open file.
 	file, err := os.Open(path)
 	if err != nil {
